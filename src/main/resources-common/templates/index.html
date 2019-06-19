@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8"/>
+    <title>Chat Client</title>
+    <link href="bootstrap.css" rel="stylesheet">
+    <!--<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">-->
+
+    <style>
+        body {
+            padding: 20px;
+        }
+
+        #console {
+            height: 400px;
+            overflow: auto;
+        }
+
+        #conListDiv {
+            height: 400px;
+            overflow: auto;
+            width:25%;
+            float:right;
+        }
+
+        .username-msg {
+            color: orange;
+        }
+
+        .connect-msg {
+            color: green;
+        }
+
+        .disconnect-msg {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+
+<h1>SIM 채팅</h1>
+<br/>
+
+<div style="width:70%;float:left" >
+    <div id="console" class="well" ></div>
+
+    <form class="well form-inline" onsubmit="return false;">
+        <input id="msg" class="input-xlarge" type="text" placeholder="Type something..." disabled/>
+        <input type="file" accept="image/*"/>
+        <button type="button" onClick="sendMessage()" class="btn" id="sendBtn" disabled>Send</button>
+        <button type="button" onClick="removeMessage()" class="btn" id="removeBtn">empty</button>
+    </form>
+</div>
+<div class="well" id = "conListDiv">
+    <ul id = "conList">
+
+    </ul>
+
+</div>
+
+<script src="js/socket.io-2.2.0.js"></script>
+<script src="js/moment-2.24.0.min.js"></script>
+<script src="js/jquery-3.3.1.min.js"></script>
+
+<script>
+    var socket;
+    var userName;
+
+    function chatting() {
+        socket = new WebSocket('ws://10.77.127.38:10100');
+        socket.onopen = function () {
+            $('#conList').empty();
+            removeMessage();
+            outputNoti('<span class="connect-msg">서버와 연결되었습니다.</span>');
+
+            var jsonObject = {
+                "command": "NAME",
+                "type": "INIT"
+            };
+            var msg_str = JSON.stringify(jsonObject);
+            socket.send(msg_str);
+
+        };
+
+        socket.onmessage = function (data) {
+            var recv_jsonObject = JSON.parse(data.data);
+
+            var command = recv_jsonObject.command;
+
+            if (command === "NAME" && recv_jsonObject.type === "INIT") {
+                userName = recv_jsonObject.userName;
+                outputNoti('<span class="connect-msg"> userName :' + userName + '</span>');
+                $('#msg').attr("disabled", false);
+                $('#sendBtn').attr("disabled", false);
+                console.log(JSON.stringify(recv_jsonObject));
+                recv_jsonObject.conList.forEach(function(el) {
+                    addConnector(el);});
+                var item = document.getElementById(userName);
+                item.style.color = 'blue';
+            }
+            else if (command === "NOTI" && recv_jsonObject.type === "ENTER") {
+                output('<span class="connect-msg">' + recv_jsonObject.userName + '님이 들어왔습니다.</span>');
+                addConnector(recv_jsonObject.userName);
+            }
+            else if (command === "NOTI" && recv_jsonObject.type === "LEAVE") {
+                output('<span class="connect-msg">' + recv_jsonObject.userName + '님이 나갔습니다.</span>');
+                removeConnector(recv_jsonObject.userName);
+            }
+            else if (command === "CHAT")
+                output('<span class="username-msg">' + recv_jsonObject.userName + ':</span> ' + recv_jsonObject.message);
+        };
+
+        socket.onclose = function () {
+            outputNoti('<span class="disconnect-msg">서버와 연결이 끊어졌습니다.</span>');
+            setTimeout(function(){ chatting()}, 1000);
+        };
+
+    }
+
+    function removeMessage() {
+        $('#console').empty()
+    }
+
+    function sendMessage() {
+        var $msg = $('#msg');
+        var message = $msg.val();
+        if (message !== '') {
+            $msg.val('');
+            var jsonObject = {
+                "command": "CHAT",
+                "message": message,
+                "actionTime": new Date()
+            };
+            var msg_str = JSON.stringify(jsonObject);
+            // console.log(msg_str);
+            socket.send(msg_str);
+        }
+    }
+
+    function output(message) {
+        var currentTime = "<span class='time'>" + moment().format('YYYY-MM-DD HH:mm:ss') + "</span>";
+        var element = $("<div>" + currentTime + " " + message + "</div>");
+        $('#console').append(element);
+
+
+        var consoleDiv = document.getElementById("console");
+
+        consoleDiv.scrollTop = consoleDiv.scrollHeight;
+    }
+
+    function outputNoti(message) {
+        var element = $("<div>" + message + "</div>");
+        $('#console').append(element);
+
+        var consoleDiv = document.getElementById("console");
+
+        consoleDiv.scrollTop = consoleDiv.scrollHeight;
+    }
+
+    function addConnector(conName){
+        var ul = document.getElementById("conList");
+        var li = document.createElement("li");
+        li.setAttribute('id', conName);
+        li.appendChild(document.createTextNode(conName));
+        ul.appendChild(li);
+    }
+
+    function removeConnector(conName){
+        var ul = document.getElementById("conList");
+        var item = document.getElementById(conName);
+        ul.removeChild(item);
+    }
+
+    $(document).keydown(function (e) {
+        if (e.keyCode == 13) {
+            $('#sendBtn').click();
+        }
+    });
+
+    chatting();
+
+
+
+</script>
+</body>
+</html>

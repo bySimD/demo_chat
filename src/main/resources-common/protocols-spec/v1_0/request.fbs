@@ -1,0 +1,24 @@
+namespace com.chatserver.demo.protocols.v1_0;
+
+enum PacketType:byte {
+    HeartBeat	= 0,
+    Login 		= 1,
+    Chat 		= 10,
+    ReName		= 20
+
+}
+
+table Packet {
+   command:PacketType;
+   message:string;
+}
+
+table NotiName {
+	nickName:string;
+}
+
+table NotiChat {
+	data:string;
+}
+
+root_type Packet;
